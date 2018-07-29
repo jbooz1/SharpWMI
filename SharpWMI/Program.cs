@@ -21,7 +21,8 @@ Set objFileToWrite = Nothing
 			Console.WriteLine("    Local system enumeration  :\r\n        SharpWMI.exe action=query query=\"select * from win32_service\" [namespace=BLAH]");
 			Console.WriteLine("    Remote system enumeration :\r\n        SharpWMI.exe action=query computername=HOST1[,HOST2,...] query=\"select * from win32_service\" [namespace=BLAH]");
 			Console.WriteLine("    Remote process creation   :\r\n        SharpWMI.exe action=create computername=HOST1[,HOST2,...] command=\"C:\\temp\\process.exe [args]\"");
-			Console.WriteLine("    Remote VBS execution      :\r\n        SharpWMI.exe action=executevbs computername=HOST1[,HOST2,...] [eventname=blah]\r\n");
+			Console.WriteLine("    Remote VBS execution      :\r\n        SharpWMI.exe action=executevbs computername=HOST1[,HOST2,...] [eventname=blah]");
+			Console.WriteLine("    Startup Persistence       :\r\n        SharpWMI.exe action=persistStartup computername=HOST1[,HOST2,...] command=\"C:\\temp\\process.exe [args]\" [eventname=blah] [cleanup=true/false]\r\n");
 
 			Console.WriteLine("    Note: Any remote function also takes an optional \"username=DOMAIN\\user\" \"password=Password123!\"\r\n");
 			Console.WriteLine("\r\n  Examples:\r\n");
@@ -32,6 +33,8 @@ Set objFileToWrite = Nothing
 			Console.WriteLine("    SharpWMI.exe action=create computername=primary.testlab.local command=\"powershell.exe -enc ZQBj...\"");
 			Console.WriteLine("    SharpWMI.exe action=executevbs computername=primary.testlab.local");
 			Console.WriteLine("    SharpWMI.exe action=executevbs computername=primary.testlab.local username=\"TESTLAB\\harmj0y\" password=\"Password123!\"");
+			Console.WriteLine("    SharpWMI.exe action=persistStartup computername=primary.testlab.local command=\"notepad.exe\" eventname=\"note\"");
+			Console.WriteLine("    SharpWMI.exe action=persistStartup computername=primary.testlab.local eventname=\"note\" cleanup=true");
 		}
 
 		// helper used to wrap long output
@@ -346,11 +349,6 @@ Set objFileToWrite = Nothing
 		/// Original code from the Empire Project authored by @mattifestation, @harmj0y
 		/// C# implementation by @jbooz1
 		/// </summary>
-		/// <param name="host"></param>
-		/// <param name="command"></param>
-		/// <param name="eventName"></param>
-		/// <param name="username"></param>
-		/// <param name="password"></param>
 		static void RemoteWMIStartup(string host, string command, string eventName, string username, string password, bool cleanup)
 		{
 			try
@@ -464,11 +462,6 @@ Set objFileToWrite = Nothing
 			}
 		}
 
-
-		/// <summary>
-		/// ////////////////////////////////////////////////////////////////////////
-		/// </summary>
-		/// <param name="args"></param>
 
 		static void Main(string[] args)
 		{
