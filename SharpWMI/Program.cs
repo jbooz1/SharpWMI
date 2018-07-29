@@ -4,470 +4,647 @@ using System.Management;
 
 namespace SharpWMI
 {
-    class Program
-    {
+	class Program
+	{
 
-        // replace the VBS below with whatever logic you want to execute for action=executevbs
-        public static string vbsPayload = @"
+		// replace the VBS below with whatever logic you want to execute for action=executevbs
+		public static string vbsPayload = @"
 Set objFileToWrite = CreateObject(""Scripting.FileSystemObject"").OpenTextFile(""C:\out.txt"",2,true)
 objFileToWrite.WriteLine(""testing"")
 objFileToWrite.Close
 Set objFileToWrite = Nothing
 ";
 
-        static void Usage()
-        {
-            Console.WriteLine("\r\n  SharpWMI\r\n");
-            Console.WriteLine("    Local system enumeration  :\r\n        SharpWMI.exe action=query query=\"select * from win32_service\" [namespace=BLAH]");
-            Console.WriteLine("    Remote system enumeration :\r\n        SharpWMI.exe action=query computername=HOST1[,HOST2,...] query=\"select * from win32_service\" [namespace=BLAH]");
-            Console.WriteLine("    Remote process creation   :\r\n        SharpWMI.exe action=create computername=HOST[,HOST2,...] command=\"C:\\temp\\process.exe [args]\"");
-            Console.WriteLine("    Remote VBS execution      :\r\n        SharpWMI.exe action=executevbs computername=HOST[,HOST2,...] [eventname=blah]\r\n");
+		static void Usage()
+		{
+			Console.WriteLine("\r\n  SharpWMI\r\n");
+			Console.WriteLine("    Local system enumeration  :\r\n        SharpWMI.exe action=query query=\"select * from win32_service\" [namespace=BLAH]");
+			Console.WriteLine("    Remote system enumeration :\r\n        SharpWMI.exe action=query computername=HOST1[,HOST2,...] query=\"select * from win32_service\" [namespace=BLAH]");
+			Console.WriteLine("    Remote process creation   :\r\n        SharpWMI.exe action=create computername=HOST1[,HOST2,...] command=\"C:\\temp\\process.exe [args]\"");
+			Console.WriteLine("    Remote VBS execution      :\r\n        SharpWMI.exe action=executevbs computername=HOST1[,HOST2,...] [eventname=blah]\r\n");
 
-            Console.WriteLine("    Note: Any remote function also takes an optional \"username=DOMAIN\\user\" \"password=Password123!\"\r\n");
-            Console.WriteLine("\r\n  Examples:\r\n");
-            Console.WriteLine("    SharpWMI.exe action=query query=\"select * from win32_process\"");
-            Console.WriteLine("    SharpWMI.exe action=query query=\"SELECT * FROM AntiVirusProduct\" namespace=\"root\\SecurityCenter2\"");
-            Console.WriteLine("    SharpWMI.exe action=query computername=primary.testlab.local query=\"select * from win32_service\"");
-            Console.WriteLine("    SharpWMI.exe action=query computername=primary,secondary query=\"select * from win32_process\"");
-            Console.WriteLine("    SharpWMI.exe action=create computername=primary.testlab.local command=\"powershell.exe -enc ZQBj...\"");
-            Console.WriteLine("    SharpWMI.exe action=executevbs computername=primary.testlab.local");
-            Console.WriteLine("    SharpWMI.exe action=executevbs computername=primary.testlab.local username=\"TESTLAB\\harmj0y\" password=\"Password123!\"");
-        }
+			Console.WriteLine("    Note: Any remote function also takes an optional \"username=DOMAIN\\user\" \"password=Password123!\"\r\n");
+			Console.WriteLine("\r\n  Examples:\r\n");
+			Console.WriteLine("    SharpWMI.exe action=query query=\"select * from win32_process\"");
+			Console.WriteLine("    SharpWMI.exe action=query query=\"SELECT * FROM AntiVirusProduct\" namespace=\"root\\SecurityCenter2\"");
+			Console.WriteLine("    SharpWMI.exe action=query computername=primary.testlab.local query=\"select * from win32_service\"");
+			Console.WriteLine("    SharpWMI.exe action=query computername=primary,secondary query=\"select * from win32_process\"");
+			Console.WriteLine("    SharpWMI.exe action=create computername=primary.testlab.local command=\"powershell.exe -enc ZQBj...\"");
+			Console.WriteLine("    SharpWMI.exe action=executevbs computername=primary.testlab.local");
+			Console.WriteLine("    SharpWMI.exe action=executevbs computername=primary.testlab.local username=\"TESTLAB\\harmj0y\" password=\"Password123!\"");
+		}
 
-        // helper used to wrap long output
-        public static System.Collections.Generic.IEnumerable<string> Split(string text, int partLength)
-        {
-            if (text == null) { throw new ArgumentNullException("singleLineString"); }
+		// helper used to wrap long output
+		public static System.Collections.Generic.IEnumerable<string> Split(string text, int partLength)
+		{
+			if (text == null) { throw new ArgumentNullException("singleLineString"); }
 
-            if (partLength < 1) { throw new ArgumentException("'columns' must be greater than 0."); }
+			if (partLength < 1) { throw new ArgumentException("'columns' must be greater than 0."); }
 
-            var partCount = Math.Ceiling((double)text.Length / partLength);
-            if (partCount < 2)
-            {
-                yield return text;
-            }
+			var partCount = Math.Ceiling((double)text.Length / partLength);
+			if (partCount < 2)
+			{
+				yield return text;
+			}
 
-            for (int i = 0; i < partCount; i++)
-            {
-                var index = i * partLength;
-                var lengthLeft = Math.Min(partLength, text.Length - index);
-                var line = text.Substring(index, lengthLeft);
-                yield return line;
-            }
-        }
+			for (int i = 0; i < partCount; i++)
+			{
+				var index = i * partLength;
+				var lengthLeft = Math.Min(partLength, text.Length - index);
+				var line = text.Substring(index, lengthLeft);
+				yield return line;
+			}
+		}
 
-        static void LocalWMIQuery(string wmiQuery, string wmiNameSpace = "")
-        {
-            ManagementObjectSearcher wmiData = null;
+		static void LocalWMIQuery(string wmiQuery, string wmiNameSpace = "")
+		{
+			ManagementObjectSearcher wmiData = null;
 
-            try
-            {
-                if (String.IsNullOrEmpty(wmiNameSpace))
-                {
-                    wmiData = new ManagementObjectSearcher(wmiQuery);
-                }
-                else
-                {
-                    wmiData = new ManagementObjectSearcher(wmiNameSpace, wmiQuery);
-                }
+			try
+			{
+				if (String.IsNullOrEmpty(wmiNameSpace))
+				{
+					wmiData = new ManagementObjectSearcher(wmiQuery);
+				}
+				else
+				{
+					wmiData = new ManagementObjectSearcher(wmiNameSpace, wmiQuery);
+				}
 
-                ManagementObjectCollection data = wmiData.Get();
-                Console.WriteLine();
+				ManagementObjectCollection data = wmiData.Get();
+				Console.WriteLine();
 
-                foreach (ManagementObject result in data)
-                {
-                    System.Management.PropertyDataCollection props = result.Properties;
-                    foreach (System.Management.PropertyData prop in props)
-                    {
-                        string propValue = String.Format("{0}", prop.Value);
-                        
-                        // wrap long output to 80 lines
-                        if (!String.IsNullOrEmpty(propValue) && (propValue.Length > 90))
-                        {
-                            bool header = false;
-                            foreach (string line in Split(propValue, 80))
-                            {
-                                if (!header)
-                                {
-                                    Console.WriteLine(String.Format("{0,30} : {1}", prop.Name, line));
-                                }
-                                else
-                                {
-                                    Console.WriteLine(String.Format("{0,30}   {1}", "", line));
-                                }
-                                header = true;
-                            }
-                        }
-                        else
-                        {
-                            Console.WriteLine(String.Format("{0,30} : {1}", prop.Name, prop.Value));
-                        }
-                    }
-                    Console.WriteLine();
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(String.Format("  Exception : {0}", ex.Message));
-            }
-        }
+				foreach (ManagementObject result in data)
+				{
+					System.Management.PropertyDataCollection props = result.Properties;
+					foreach (System.Management.PropertyData prop in props)
+					{
+						string propValue = String.Format("{0}", prop.Value);
 
-        static void RemoteWMIQuery(string host, string wmiQuery, string wmiNameSpace, string username, string password)
-        {
-            if (wmiNameSpace == "")
-            {
-                wmiNameSpace = "root\\cimv2";
-            }
+						// wrap long output to 80 lines
+						if (!String.IsNullOrEmpty(propValue) && (propValue.Length > 90))
+						{
+							bool header = false;
+							foreach (string line in Split(propValue, 80))
+							{
+								if (!header)
+								{
+									Console.WriteLine(String.Format("{0,30} : {1}", prop.Name, line));
+								}
+								else
+								{
+									Console.WriteLine(String.Format("{0,30}   {1}", "", line));
+								}
+								header = true;
+							}
+						}
+						else
+						{
+							Console.WriteLine(String.Format("{0,30} : {1}", prop.Name, prop.Value));
+						}
+					}
+					Console.WriteLine();
+				}
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine(String.Format("  Exception : {0}", ex.Message));
+			}
+		}
 
-            ConnectionOptions options = new ConnectionOptions();
+		static void RemoteWMIQuery(string host, string wmiQuery, string wmiNameSpace, string username, string password)
+		{
+			if (wmiNameSpace == "")
+			{
+				wmiNameSpace = "root\\cimv2";
+			}
 
-            Console.WriteLine("\r\n  Scope: \\\\{0}\\{1}", host, wmiNameSpace);
+			ConnectionOptions options = new ConnectionOptions();
 
-            if (!String.IsNullOrEmpty(username))
-            {
-                Console.WriteLine("  User credentials: {0}", username);
-                options.Username = username;
-                options.Password = password;
-            }
-            Console.WriteLine();
+			Console.WriteLine("\r\n  Scope: \\\\{0}\\{1}", host, wmiNameSpace);
 
-            ManagementScope scope = new ManagementScope(String.Format("\\\\{0}\\{1}", host, wmiNameSpace), options);
+			if (!String.IsNullOrEmpty(username))
+			{
+				Console.WriteLine("  User credentials: {0}", username);
+				options.Username = username;
+				options.Password = password;
+			}
+			Console.WriteLine();
 
-            try
-            {
-                scope.Connect();
+			ManagementScope scope = new ManagementScope(String.Format("\\\\{0}\\{1}", host, wmiNameSpace), options);
 
-                ObjectQuery query = new ObjectQuery(wmiQuery);
-                ManagementObjectSearcher searcher = new ManagementObjectSearcher(scope, query);
-                ManagementObjectCollection data = searcher.Get();
+			try
+			{
+				scope.Connect();
 
-                Console.WriteLine();
+				ObjectQuery query = new ObjectQuery(wmiQuery);
+				ManagementObjectSearcher searcher = new ManagementObjectSearcher(scope, query);
+				ManagementObjectCollection data = searcher.Get();
 
-                foreach (ManagementObject result in data)
-                {
-                    System.Management.PropertyDataCollection props = result.Properties;
-                    foreach (System.Management.PropertyData prop in props)
-                    {
-                        Console.WriteLine(String.Format("{0,30} : {1}", prop.Name, prop.Value));
-                    }
-                    Console.WriteLine();
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(String.Format("  Exception : {0}", ex.Message));
-            }
-        }
+				Console.WriteLine();
 
-        static void RemoteWMIExecute(string host, string command, string username, string password)
-        {
-            string wmiNameSpace = "root\\cimv2";
+				foreach (ManagementObject result in data)
+				{
+					System.Management.PropertyDataCollection props = result.Properties;
+					foreach (System.Management.PropertyData prop in props)
+					{
+						Console.WriteLine(String.Format("{0,30} : {1}", prop.Name, prop.Value));
+					}
+					Console.WriteLine();
+				}
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine(String.Format("  Exception : {0}", ex.Message));
+			}
+		}
 
-            ConnectionOptions options = new ConnectionOptions();
+		static void RemoteWMIExecute(string host, string command, string username, string password)
+		{
+			string wmiNameSpace = "root\\cimv2";
 
-            Console.WriteLine("\r\n  Host                           : {0}", host);
-            Console.WriteLine("  Command                        : {0}", command);
+			ConnectionOptions options = new ConnectionOptions();
 
-            if (!String.IsNullOrEmpty(username))
-            {
-                Console.WriteLine("  User credentials               : {0}", username);
-                options.Username = username;
-                options.Password = password;
-            }
-            Console.WriteLine();
+			Console.WriteLine("\r\n  Host                           : {0}", host);
+			Console.WriteLine("  Command                        : {0}", command);
 
-            ManagementScope scope = new ManagementScope(String.Format("\\\\{0}\\{1}", host, wmiNameSpace), options);
+			if (!String.IsNullOrEmpty(username))
+			{
+				Console.WriteLine("  User credentials               : {0}", username);
+				options.Username = username;
+				options.Password = password;
+			}
+			Console.WriteLine();
 
-            try
-            {
-                scope.Connect();
+			ManagementScope scope = new ManagementScope(String.Format("\\\\{0}\\{1}", host, wmiNameSpace), options);
 
-                var wmiProcess = new ManagementClass(scope, new ManagementPath("Win32_Process"), new ObjectGetOptions());
+			try
+			{
+				scope.Connect();
 
-                ManagementBaseObject inParams = wmiProcess.GetMethodParameters("Create");
-                System.Management.PropertyDataCollection properties = inParams.Properties;
+				var wmiProcess = new ManagementClass(scope, new ManagementPath("Win32_Process"), new ObjectGetOptions());
 
-                inParams["CommandLine"] = command;
+				ManagementBaseObject inParams = wmiProcess.GetMethodParameters("Create");
+				System.Management.PropertyDataCollection properties = inParams.Properties;
 
-                ManagementBaseObject outParams = wmiProcess.InvokeMethod("Create", inParams, null);
+				inParams["CommandLine"] = command;
 
-                Console.WriteLine("  Creation of process returned   : {0}", outParams["returnValue"]);
-                Console.WriteLine("  Process ID                     : {0}\r\n", outParams["processId"]);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(String.Format("  Exception : {0}", ex.Message));
-            }
-        }
+				ManagementBaseObject outParams = wmiProcess.InvokeMethod("Create", inParams, null);
 
-        static void RemoteWMIExecuteVBS(string host, string eventName, string username, string password)
-        {
-            try
-            {
-                ConnectionOptions options = new ConnectionOptions();
-                if (!String.IsNullOrEmpty(username))
-                {
-                    Console.WriteLine("[*] User credentials: {0}", username);
-                    options.Username = username;
-                    options.Password = password;
-                }
-                Console.WriteLine();
+				Console.WriteLine("  Creation of process returned   : {0}", outParams["returnValue"]);
+				Console.WriteLine("  Process ID                     : {0}\r\n", outParams["processId"]);
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine(String.Format("  Exception : {0}", ex.Message));
+			}
+		}
 
-                // first create a 30 second timer on the remote host
-                ManagementScope timerScope = new ManagementScope(string.Format(@"\\{0}\root\cimv2", host), options);
-                ManagementClass timerClass = new ManagementClass(timerScope, new ManagementPath("__IntervalTimerInstruction"), null);
-                ManagementObject myTimer = timerClass.CreateInstance();
-                myTimer["IntervalBetweenEvents"] = (UInt32)30000;
-                myTimer["SkipIfPassed"] = false;
-                myTimer["TimerId"] = "Timer";
-                try
-                {
-                    Console.WriteLine("[*] Creating 'Timer' object on {0}", host);
-                    myTimer.Put();
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine("[X] Exception in creating timer object: {0}", ex.Message);
-                    return;
-                }
+		static void RemoteWMIExecuteVBS(string host, string eventName, string username, string password)
+		{
+			try
+			{
+				ConnectionOptions options = new ConnectionOptions();
+				if (!String.IsNullOrEmpty(username))
+				{
+					Console.WriteLine("[*] User credentials: {0}", username);
+					options.Username = username;
+					options.Password = password;
+				}
+				Console.WriteLine();
 
-                ManagementScope scope = new ManagementScope(string.Format(@"\\{0}\root\subscription", host), options);
+				// first create a 30 second timer on the remote host
+				ManagementScope timerScope = new ManagementScope(string.Format(@"\\{0}\root\cimv2", host), options);
+				ManagementClass timerClass = new ManagementClass(timerScope, new ManagementPath("__IntervalTimerInstruction"), null);
+				ManagementObject myTimer = timerClass.CreateInstance();
+				myTimer["IntervalBetweenEvents"] = (UInt32)30000;
+				myTimer["SkipIfPassed"] = false;
+				myTimer["TimerId"] = "Timer";
+				try
+				{
+					Console.WriteLine("[*] Creating 'Timer' object on {0}", host);
+					myTimer.Put();
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine("[X] Exception in creating timer object: {0}", ex.Message);
+					return;
+				}
 
-                // then install the __EventFilter for the timer object
-                ManagementClass wmiEventFilter = new ManagementClass(scope, new ManagementPath("__EventFilter"), null);
-                WqlEventQuery myEventQuery = new WqlEventQuery(@"SELECT * FROM __TimerEvent WHERE TimerID = 'Timer'");
-                ManagementObject myEventFilter = wmiEventFilter.CreateInstance();
-                myEventFilter["Name"] = eventName;
-                myEventFilter["Query"] = myEventQuery.QueryString;
-                myEventFilter["QueryLanguage"] = myEventQuery.QueryLanguage;
-                myEventFilter["EventNameSpace"] = @"\root\cimv2";
-                try
-                {
-                    Console.WriteLine("[*] Setting '{0}' event filter on {1}", eventName, host);
-                    myEventFilter.Put();
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine("[X] Exception in setting event filter: {0}", ex.Message);
-                }
+				ManagementScope scope = new ManagementScope(string.Format(@"\\{0}\root\subscription", host), options);
 
-
-                // now create the ActiveScriptEventConsumer payload (VBS)
-                ManagementObject myEventConsumer = new ManagementClass(scope, new ManagementPath("ActiveScriptEventConsumer"), null).CreateInstance();
-
-                myEventConsumer["Name"] = eventName;
-                myEventConsumer["ScriptingEngine"] = "VBScript";
-                myEventConsumer["ScriptText"] = vbsPayload;
-                myEventConsumer["KillTimeout"] = (UInt32)45;
-
-                try
-                {
-                    Console.WriteLine("[*] Setting '{0}' event consumer on {1}", eventName, host);
-                    myEventConsumer.Put();
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine("[X] Exception in setting event consumer: {0}", ex.Message);
-                }
+				// then install the __EventFilter for the timer object
+				ManagementClass wmiEventFilter = new ManagementClass(scope, new ManagementPath("__EventFilter"), null);
+				WqlEventQuery myEventQuery = new WqlEventQuery(@"SELECT * FROM __TimerEvent WHERE TimerID = 'Timer'");
+				ManagementObject myEventFilter = wmiEventFilter.CreateInstance();
+				myEventFilter["Name"] = eventName;
+				myEventFilter["Query"] = myEventQuery.QueryString;
+				myEventFilter["QueryLanguage"] = myEventQuery.QueryLanguage;
+				myEventFilter["EventNameSpace"] = @"\root\cimv2";
+				try
+				{
+					Console.WriteLine("[*] Setting '{0}' event filter on {1}", eventName, host);
+					myEventFilter.Put();
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine("[X] Exception in setting event filter: {0}", ex.Message);
+				}
 
 
-                // finally bind them together with a __FilterToConsumerBinding
-                ManagementObject myBinder = new ManagementClass(scope, new ManagementPath("__FilterToConsumerBinding"), null).CreateInstance();
+				// now create the ActiveScriptEventConsumer payload (VBS)
+				ManagementObject myEventConsumer = new ManagementClass(scope, new ManagementPath("ActiveScriptEventConsumer"), null).CreateInstance();
 
-                myBinder["Filter"] = myEventFilter.Path.RelativePath;
-                myBinder["Consumer"] = myEventConsumer.Path.RelativePath;
+				myEventConsumer["Name"] = eventName;
+				myEventConsumer["ScriptingEngine"] = "VBScript";
+				myEventConsumer["ScriptText"] = vbsPayload;
+				myEventConsumer["KillTimeout"] = (UInt32)45;
 
-                try
-                {
-                    Console.WriteLine("[*] Binding '{0}' event filter and consumer on {1}", eventName, host);
-                    myBinder.Put();
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine("[X] Exception in setting FilterToConsumerBinding: {0}", ex.Message);
-                }
-
-
-                // wait for everything to trigger
-                Console.WriteLine("\r\n[*] Waiting 45 seconds for event to trigger on {0} ...\r\n", host);
-                System.Threading.Thread.Sleep(45 * 1000);
+				try
+				{
+					Console.WriteLine("[*] Setting '{0}' event consumer on {1}", eventName, host);
+					myEventConsumer.Put();
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine("[X] Exception in setting event consumer: {0}", ex.Message);
+				}
 
 
-                // finally, cleanup
-                try
-                {
-                    Console.WriteLine("[*] Removing 'Timer' internal timer from {0}", host);
-                    myTimer.Delete();
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine("[X] Exception in removing 'Timer' interval timer: {0}", ex.Message);
-                }
+				// finally bind them together with a __FilterToConsumerBinding
+				ManagementObject myBinder = new ManagementClass(scope, new ManagementPath("__FilterToConsumerBinding"), null).CreateInstance();
 
-                try
-                {
-                    Console.WriteLine("[*] Removing FilterToConsumerBinding from {0}", host);
-                    myBinder.Delete();
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine("[X] Exception in removing FilterToConsumerBinding: {0}", ex.Message);
-                }
+				myBinder["Filter"] = myEventFilter.Path.RelativePath;
+				myBinder["Consumer"] = myEventConsumer.Path.RelativePath;
 
-                try
-                {
-                    Console.WriteLine("[*] Removing '{0}' event filter from {1}", eventName, host);
-                    myEventFilter.Delete();
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine("[X] Exception in removing event filter: {0}", ex.Message);
-                }
+				try
+				{
+					Console.WriteLine("[*] Binding '{0}' event filter and consumer on {1}", eventName, host);
+					myBinder.Put();
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine("[X] Exception in setting FilterToConsumerBinding: {0}", ex.Message);
+				}
 
-                try
-                {
-                    Console.WriteLine("[*] Removing '{0}' event consumer from {0}\r\n", eventName, host);
-                    myEventConsumer.Delete();
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine("[X] Exception in removing event consumer: {0}", ex.Message);
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(String.Format("  Exception : {0}", ex.Message));
-            }
-        }
 
-        static void Main(string[] args)
-        {
-            if (args.Length < 2)
-            {
-                Usage();
-                return;
-            }
+				// wait for everything to trigger
+				Console.WriteLine("\r\n[*] Waiting 45 seconds for event to trigger on {0} ...\r\n", host);
+				System.Threading.Thread.Sleep(45 * 1000);
 
-            var arguments = new Dictionary<string, string>();
-            foreach (string argument in args)
-            {
-                int idx = argument.IndexOf('=');
-                if (idx > 0)
-                    arguments[argument.Substring(0, idx)] = argument.Substring(idx + 1);
-            }
 
-            string username = "";
-            string password = "";
+				// finally, cleanup
+				try
+				{
+					Console.WriteLine("[*] Removing 'Timer' internal timer from {0}", host);
+					myTimer.Delete();
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine("[X] Exception in removing 'Timer' interval timer: {0}", ex.Message);
+				}
 
-            if (arguments.ContainsKey("username"))
-            {
-                if (!arguments.ContainsKey("password"))
-                {
-                    Usage();
-                    return;
-                }
-                else
-                {
-                    username = arguments["username"];
-                    password = arguments["password"];
-                }
-            }
+				try
+				{
+					Console.WriteLine("[*] Removing FilterToConsumerBinding from {0}", host);
+					myBinder.Delete();
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine("[X] Exception in removing FilterToConsumerBinding: {0}", ex.Message);
+				}
 
-            if (arguments.ContainsKey("password") && !arguments.ContainsKey("username"))
-            {
-                Usage();
-                return;
-            }
+				try
+				{
+					Console.WriteLine("[*] Removing '{0}' event filter from {1}", eventName, host);
+					myEventFilter.Delete();
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine("[X] Exception in removing event filter: {0}", ex.Message);
+				}
 
-            if (!arguments.ContainsKey("action"))
-            {
-                Usage();
-                return;
-            }
+				try
+				{
+					Console.WriteLine("[*] Removing '{0}' event consumer from {0}\r\n", eventName, host);
+					myEventConsumer.Delete();
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine("[X] Exception in removing event consumer: {0}", ex.Message);
+				}
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine(String.Format("  Exception : {0}", ex.Message));
+			}
+		}
 
-            if (arguments["action"] == "query")
-            {
-                if (!arguments.ContainsKey("query"))
-                {
-                    Usage();
-                    return;
-                }
 
-                if (arguments.ContainsKey("computername"))
-                {
-                    // remote query
-                    string[] computerNames = arguments["computername"].Split(',');
-                    foreach (string computerName in computerNames) {
-                        if (arguments.ContainsKey("namespace"))
-                        {
-                            RemoteWMIQuery(computerName, arguments["query"], arguments["namespace"], username, password);
-                        }
-                        else
-                        {
-                            RemoteWMIQuery(computerName, arguments["query"], "", username, password);
-                        }
-                    }
-                }
-                else
-                {
-                    // local query
-                    if (arguments.ContainsKey("namespace"))
-                    {
-                        LocalWMIQuery(arguments["query"], arguments["namespace"]);
-                    }
-                    else
-                    {
-                        LocalWMIQuery(arguments["query"]);
-                    }
-                }
-            }
+		/// <summary>
+		/// Install a WMI Entry for Startup Persistence
+		/// Original code from the Empire Project authored by @mattifestation, @harmj0y
+		/// C# implementation by @jbooz1
+		/// </summary>
+		/// <param name="host"></param>
+		/// <param name="command"></param>
+		/// <param name="eventName"></param>
+		/// <param name="username"></param>
+		/// <param name="password"></param>
+		static void RemoteWMIStartup(string host, string command, string eventName, string username, string password, bool cleanup)
+		{
+			try
+			{
+				ConnectionOptions options = new ConnectionOptions();
+				if (!String.IsNullOrEmpty(username))
+				{
+					Console.WriteLine("[*] User credentials: {0}", username);
+					options.Username = username;
+					options.Password = password;
+				}
+				Console.WriteLine();
 
-            else if (arguments["action"] == "create")
-            {
-                // remote process call creation
-                if ((arguments.ContainsKey("computername")) && (arguments.ContainsKey("command")))
-                {
-                    string[] computerNames = arguments["computername"].Split(',');
-                    foreach (string computerName in computerNames)
-                    {
-                        RemoteWMIExecute(computerName, arguments["command"], username, password);
-                    }
-                }
-                else
-                {
-                    Usage();
-                    return;
-                }
-            }
+				
+				if (!cleanup)
+				{
+					ManagementScope scope = new ManagementScope(string.Format(@"\\{0}\root\subscription", host), options);
 
-            else if (arguments["action"] == "executevbs")
-            {
-                // remote VBS execution
-                if (arguments.ContainsKey("computername"))
-                {
-                    string[] computerNames = arguments["computername"].Split(',');
-                    foreach (string computerName in computerNames)
-                    {
-                        string eventName = "Debug";
-                        if (arguments.ContainsKey("eventname"))
-                        {
-                            eventName = arguments["eventname"];
-                        }
-                        RemoteWMIExecuteVBS(computerName, eventName, username, password);
-                    }
-                }
-                else
-                {
-                    Usage();
-                    return;
-                }
-            }
+					// install the __EventFilter for the startup event
+					ManagementClass wmiEventFilter = new ManagementClass(scope, new ManagementPath("__EventFilter"), null);
+					WqlEventQuery myEventQuery = new WqlEventQuery(@"SELECT * FROM __InstanceModificationEvent WITHIN 60 WHERE TargetInstance ISA 'Win32_PerfFormattedData_PerfOS_System' AND TargetInstance.SystemUpTime >= 240 AND TargetInstance.SystemUpTime < 325");
+					ManagementObject myEventFilter = wmiEventFilter.CreateInstance();
+					myEventFilter["Name"] = eventName;
+					myEventFilter["Query"] = myEventQuery.QueryString;
+					myEventFilter["QueryLanguage"] = myEventQuery.QueryLanguage;
+					myEventFilter["EventNameSpace"] = @"\root\cimv2";
+					try
+					{
+						Console.WriteLine("[*] Setting '{0}' event filter on {1}", eventName, host);
+						myEventFilter.Put();
+					}
+					catch (Exception ex)
+					{
+						Console.WriteLine("[X] Exception in setting event filter: {0}", ex.Message);
+					}
 
-            else
-            {
-                Usage();
-                return;
-            }
-        }
-    }
+					// now create the CommandLineEventConsumer payload
+					ManagementObject myEventConsumer = new ManagementClass(scope, new ManagementPath("CommandLineEventConsumer"), null).CreateInstance();
+
+					myEventConsumer["Name"] = eventName;
+					myEventConsumer["CommandLineTemplate"] = command;
+					myEventConsumer["RunInteractively"] = false;
+
+					try
+					{
+						Console.WriteLine("[*] Setting '{0}' event consumer on {1}", eventName, host);
+						myEventConsumer.Put();
+					}
+					catch (Exception ex)
+					{
+						Console.WriteLine("[X] Exception in setting event consumer: {0}", ex.Message);
+					}
+
+					// finally bind them together with a __FilterToConsumerBinding
+					ManagementObject myBinder = new ManagementClass(scope, new ManagementPath("__FilterToConsumerBinding"), null).CreateInstance();
+
+					myBinder["Filter"] = myEventFilter.Path.RelativePath;
+					myBinder["Consumer"] = myEventConsumer.Path.RelativePath;
+
+					try
+					{
+						Console.WriteLine("[*] Binding '{0}' event filter and consumer on {1}", eventName, host);
+						myBinder.Put();
+					}
+					catch (Exception ex)
+					{
+						Console.WriteLine("[X] Exception in setting FilterToConsumerBinding: {0}", ex.Message);
+					}
+				}
+
+				//Cleanup
+				else
+				{
+					try
+					{
+						//WQL Queries for each of the WMI entries
+						string eventFilterWql = string.Format("SELECT * FROM __eventFilter WHERE name='{0}'", eventName);
+						string cmdlLineEventWql = string.Format("SELECT * FROM CommandLineEventConsumer WHERE name='{0}'", eventName);
+						string bindingWql = string.Format("SELECT * FROM __FilterToConsumerBinding WHERE __PATH LIKE '%{0}%'", eventName);
+
+						string[] queries = { eventFilterWql, cmdlLineEventWql, bindingWql };
+
+						string wmiNameSpace = "root\\subscription";
+						ManagementScope scope = new ManagementScope(String.Format("\\\\{0}\\{1}", host, wmiNameSpace), options);
+						scope.Connect();
+
+						//For each WQL query, remove the matches
+						foreach (string wmiQuery in queries)
+						{
+							ObjectQuery query = new ObjectQuery(wmiQuery);
+							ManagementObjectSearcher searcher = new ManagementObjectSearcher(scope, query);
+							ManagementObjectCollection data = searcher.Get();
+
+							foreach (ManagementObject obj in data)
+							{
+								obj.Delete();
+							}
+						}
+
+						Console.WriteLine(String.Format(@"[*] WMI persistence removed on {0}", host));
+					}
+					catch (Exception ex)
+					{
+						Console.WriteLine(String.Format("  Exception : {0}", ex.Message));
+					}
+				}
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine(String.Format("  Exception : {0}", ex.Message));
+			}
+		}
+
+
+		/// <summary>
+		/// ////////////////////////////////////////////////////////////////////////
+		/// </summary>
+		/// <param name="args"></param>
+
+		static void Main(string[] args)
+		{
+			if (args.Length < 2)
+			{
+				Usage();
+				return;
+			}
+
+			var arguments = new Dictionary<string, string>();
+			foreach (string argument in args)
+			{
+				int idx = argument.IndexOf('=');
+				if (idx > 0)
+					arguments[argument.Substring(0, idx)] = argument.Substring(idx + 1);
+			}
+
+			string username = "";
+			string password = "";
+
+			if (arguments.ContainsKey("username"))
+			{
+				if (!arguments.ContainsKey("password"))
+				{
+					Usage();
+					return;
+				}
+				else
+				{
+					username = arguments["username"];
+					password = arguments["password"];
+				}
+			}
+
+			if (arguments.ContainsKey("password") && !arguments.ContainsKey("username"))
+			{
+				Usage();
+				return;
+			}
+
+			if (!arguments.ContainsKey("action"))
+			{
+				Usage();
+				return;
+			}
+
+			if (arguments["action"] == "query")
+			{
+				if (!arguments.ContainsKey("query"))
+				{
+					Usage();
+					return;
+				}
+
+				if (arguments.ContainsKey("computername"))
+				{
+					// remote query
+					string[] computerNames = arguments["computername"].Split(',');
+					foreach (string computerName in computerNames)
+					{
+						if (arguments.ContainsKey("namespace"))
+						{
+							RemoteWMIQuery(computerName, arguments["query"], arguments["namespace"], username, password);
+						}
+						else
+						{
+							RemoteWMIQuery(computerName, arguments["query"], "", username, password);
+						}
+					}
+				}
+				else
+				{
+					// local query
+					if (arguments.ContainsKey("namespace"))
+					{
+						LocalWMIQuery(arguments["query"], arguments["namespace"]);
+					}
+					else
+					{
+						LocalWMIQuery(arguments["query"]);
+					}
+				}
+			}
+
+			else if (arguments["action"] == "create")
+			{
+				// remote process call creation
+				if ((arguments.ContainsKey("computername")) && (arguments.ContainsKey("command")))
+				{
+					string[] computerNames = arguments["computername"].Split(',');
+					foreach (string computerName in computerNames)
+					{
+						RemoteWMIExecute(computerName, arguments["command"], username, password);
+					}
+				}
+				else
+				{
+					Usage();
+					return;
+				}
+			}
+
+			else if (arguments["action"] == "executevbs")
+			{
+				// remote VBS execution
+				if (arguments.ContainsKey("computername"))
+				{
+					string[] computerNames = arguments["computername"].Split(',');
+					foreach (string computerName in computerNames)
+					{
+						string eventName = "Debug";
+						if (arguments.ContainsKey("eventname"))
+						{
+							eventName = arguments["eventname"];
+						}
+						RemoteWMIExecuteVBS(computerName, eventName, username, password);
+					}
+				}
+				else
+				{
+					Usage();
+					return;
+				}
+			}
+
+			else if (arguments["action"] == "persistStartup")
+			{
+				// remote hosts
+				if (arguments.ContainsKey("computername"))
+				{
+					//cleanup is false by default
+					bool cleanup = false;
+					if (arguments.ContainsKey("cleanup") && arguments["cleanup"] == "true")
+					{
+						cleanup = true;
+					}
+
+					//default eventName is Debug
+					string eventName = "Debug";
+					if (arguments.ContainsKey("eventname"))
+					{
+						eventName = arguments["eventname"];
+					}
+
+					//empty command by default because you don't need to supply one when cleaning up
+					string command = "";
+					if (arguments.ContainsKey("command"))
+					{
+						command = arguments["command"];
+					}
+
+					//if cleanup is false and a command is given   OR  if cleanup is true
+					if ((!cleanup && !String.IsNullOrEmpty(command)) || cleanup)
+					{
+						//run persistence on all computerNames given
+						string[] computerNames = arguments["computername"].Split(',');
+						foreach (string computerName in computerNames)
+						{
+							RemoteWMIStartup(computerName, command, eventName, username, password, cleanup);
+						}
+					}
+
+					//if cleanup is false and a command is not given, then do not run
+					else
+					{
+						Usage();
+						return;
+					}
+				}
+			}
+
+			else
+			{
+				Usage();
+				return;
+			}
+		}
+	}
 }
